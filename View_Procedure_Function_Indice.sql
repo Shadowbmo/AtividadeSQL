@@ -64,7 +64,8 @@ $$ LANGUAGE plpgsql;
 -- Chamar a função (1)
 -- -----------------------------------------------------
 
-SELECT CalculaImpostosVendas(1) AS Impostos;
+select * from supermercado;
+SELECT CalculaImpostosVendas(1, '11.111.111/0001-11') AS Impostos;
 
 -- -----------------------------------------------------
 -- Criar a função (2) Calcular lucro por periodo informado
@@ -75,7 +76,6 @@ RETURNS TABLE (
     nome_produto VARCHAR(45),
     valor_unitario DECIMAL,
     valor_lucro DECIMAL,
-    melhor_mes VARCHAR(20),
     quantidade_restante DECIMAL,
     valor_compra DECIMAL
 ) AS $$
@@ -95,16 +95,19 @@ BEGIN
   WHERE v.DTH_VENDA BETWEEN parametro_data_inicio AND parametro_data_fim
     AND p.CODIGO_DE_BARRAS = parametro_codigo_barras
     AND s.CNPJ = parametro_cnpj
-  GROUP BY p.NOME_PRO, p.VLR_VENDA, DATE_TRUNC('month', v.DTH_VENDA), cp.NRO_QUANTIDADE, cp.VLR_COMPRA
+  GROUP BY p.NOME_PRO, p.VLR_VENDA, DATE_TRUNC('month', v.DTH_VENDA), cp.NRO_QUANTIDADE, cp.VLR_COMPRA;
+  
+  RETURN;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- -----------------------------------------------------
 -- Chamar a função (2)
 -- -----------------------------------------------------
 
-SELECT nome_produto, valor_unitario,  valor_total, valor_compra, quantidade_restante, valor_lucro, melhor_mes
-FROM calcular_lucro_periodo('2023-01-01', '2023-06-30', '12', '11.111.111/0001-11');
+SELECT nome_produto, valor_unitario, valor_compra, quantidade_restante, valor_lucro
+FROM calcular_lucro_periodo('2023-01-01', '2023-12-30', '12', '11.111.111/0001-11');
 
 -- -----------------------------------------------------
 -- Criar um indice para o codigo de barras do produto
@@ -209,8 +212,6 @@ BEGIN
         ROLLBACK;
         RAISE EXCEPTION 'Erro ao atualizar as quantidades.';
       END IF;
-
-      -- Commit explícito
       COMMIT;
     END;
   END;
@@ -271,7 +272,7 @@ BEGIN
 
             -- Verificar se a quantidade fornecida é maior do que a disponível em Controle_Produto
             IF variavel_quantidade > (SELECT sum(nro_quantidade) FROM controle_produto WHERE nro_int_pro = vaiavel_nro_int_pro) THEN
-                -- ROLLBACK
+                ROLLBACK;
                 RAISE EXCEPTION 'Quantidade fornecida é maior do que a disponível em Controle_Produto';
             END IF;
 
@@ -298,7 +299,6 @@ BEGIN
 
         COMMIT;
       EXCEPTION WHEN OTHERS THEN
-            -- Realizar o ROLLBACK
             ROLLBACK;
             RAISE EXCEPTION 'Ocorreu um erro ao realizar a compra. A transação foi revertida (ROLLBACK)';
     END;
